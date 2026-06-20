@@ -120,8 +120,10 @@ export function createEyeBeams(cfg: EyeBeamsConfig): Fight {
       const e = eyes[i];
       if (!e.active) continue;
 
-      e.phaseAngle += cfg.orbitSpeed * dt;
-      e.radiusPhase += RADIUS_OSC_SPEED * dt;
+      if (e.phase === PHASE_ORBIT) {
+        e.phaseAngle += cfg.orbitSpeed * dt;
+        e.radiusPhase += RADIUS_OSC_SPEED * dt;
+      }
       const r = cfg.orbitRadius + cfg.orbitRadiusAmp * Math.sin(e.radiusPhase);
       e.x = CX + Math.cos(e.phaseAngle) * r;
       e.y = CY + Math.sin(e.phaseAngle) * r;
@@ -135,6 +137,8 @@ export function createEyeBeams(cfg: EyeBeamsConfig): Fight {
       if (e.phase === PHASE_ORBIT) {
         e.fireTimer -= dt;
         if (e.fireTimer <= 0 && firedVolleys < cfg.volleys) {
+          e.aimDx = e.lookDx;
+          e.aimDy = e.lookDy;
           e.phase = PHASE_TELEGRAPH;
           e.stateTimer = 0;
         }
@@ -145,8 +149,6 @@ export function createEyeBeams(cfg: EyeBeamsConfig): Fight {
           e.phase = PHASE_FIRE;
           e.stateTimer = 0;
           firedVolleys++;
-          e.aimDx = e.lookDx;
-          e.aimDy = e.lookDy;
         }
       } else {
         anyBusy = true;
