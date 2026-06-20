@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { drawSprite, drawUfo, drawBeam, ALIEN, UFO_COLORS } from "./sprites";
+import { drawSprite, drawUfo, drawBeam, drawEye, drawSmallEye, drawBeamLine, ALIEN, UFO_COLORS } from "./sprites";
 
 function fakeCtx() {
   const calls: { x: number; y: number; w: number; h: number; fill: string }[] = [];
@@ -60,5 +60,63 @@ describe("drawBeam", () => {
 describe("UFO_COLORS", () => {
   it("has six colors", () => {
     expect(UFO_COLORS.length).toBe(6);
+  });
+});
+
+function eyeFakeCtx() {
+  const counts = { arc: 0, fill: 0, stroke: 0 };
+  let fillStyle = "";
+  let strokeStyle = "";
+  let lineWidth = 0;
+  let globalAlpha = 1;
+  let lineCap = "";
+  const stateStack: { globalAlpha: number }[] = [];
+  return {
+    get fillStyle() { return fillStyle; },
+    set fillStyle(v: string) { fillStyle = v; },
+    get strokeStyle() { return strokeStyle; },
+    set strokeStyle(v: string) { strokeStyle = v; },
+    get lineWidth() { return lineWidth; },
+    set lineWidth(v: number) { lineWidth = v; },
+    get globalAlpha() { return globalAlpha; },
+    set globalAlpha(v: number) { globalAlpha = v; },
+    get lineCap() { return lineCap; },
+    set lineCap(v: string) { lineCap = v; },
+    save() { stateStack.push({ globalAlpha }); },
+    restore() { const s = stateStack.pop(); if (s) globalAlpha = s.globalAlpha; },
+    beginPath() {},
+    moveTo() {},
+    lineTo() {},
+    arc() { counts.arc++; },
+    fill() { counts.fill++; },
+    stroke() { counts.stroke++; },
+    fillRect() {},
+    counts,
+  };
+}
+
+describe("drawEye", () => {
+  it("draws several arcs and fills without throwing", () => {
+    const ctx = eyeFakeCtx();
+    drawEye(ctx as unknown as CanvasRenderingContext2D, 100, 100, 22, 1, 0);
+    expect(ctx.counts.arc).toBeGreaterThanOrEqual(3);
+    expect(ctx.counts.fill).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("drawSmallEye", () => {
+  it("draws arcs without throwing", () => {
+    const ctx = eyeFakeCtx();
+    drawSmallEye(ctx as unknown as CanvasRenderingContext2D, 50, 60, 7);
+    expect(ctx.counts.arc).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("drawBeamLine", () => {
+  it("strokes a line and resets alpha", () => {
+    const ctx = eyeFakeCtx();
+    drawBeamLine(ctx as unknown as CanvasRenderingContext2D, 0, 0, 100, 100, 26, "#ff3b6b", 0.85);
+    expect(ctx.counts.stroke).toBeGreaterThanOrEqual(1);
+    expect(ctx.globalAlpha).toBe(1);
   });
 });
