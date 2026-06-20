@@ -3,6 +3,7 @@ import { rectsOverlap, distancePointToSegment } from "../collision";
 import { ARENA, CURSOR_SIZE } from "../constants";
 import type { Cursor } from "../movement";
 import type { Fight, FightStatus, FightDefinition, FightParam } from "./types";
+import { drawEye, drawSmallEye, drawBeamLine } from "../sprites";
 
 export interface EyeBeamsConfig {
   seed: number;
@@ -233,8 +234,24 @@ export function createEyeBeams(cfg: EyeBeamsConfig): Fight {
     return "running";
   }
 
-  function draw(_ctx: CanvasRenderingContext2D): void {
-    // Implemented in Task 5.
+  function draw(ctx: CanvasRenderingContext2D): void {
+    for (let i = 0; i < MAX_EYES; i++) {
+      const e = eyes[i];
+      if (!e.active) continue;
+      const ex = e.x + e.aimDx * BEAM_LEN;
+      const ey = e.y + e.aimDy * BEAM_LEN;
+      if (e.phase === PHASE_TELEGRAPH) {
+        drawBeamLine(ctx, e.x, e.y, ex, ey, 3, "#ff5cf0", 0.5);
+      } else if (e.phase === PHASE_FIRE) {
+        drawBeamLine(ctx, e.x, e.y, ex, ey, cfg.beamWidth, "#ff3b6b", 0.85);
+      }
+      drawEye(ctx, e.x, e.y, EYE_R, e.lookDx, e.lookDy);
+    }
+    for (let i = 0; i < SMALL_POOL; i++) {
+      const s = smalls[i];
+      if (!s.active) continue;
+      drawSmallEye(ctx, s.x, s.y, SMALL_R);
+    }
   }
 
   return { update, draw, reset };

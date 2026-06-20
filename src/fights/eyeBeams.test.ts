@@ -80,3 +80,20 @@ describe("EYE_BEAMS definition", () => {
     }
   });
 });
+
+describe("EyeBeams draw", () => {
+  it("draws eyes (and any active beams) without throwing", () => {
+    const calls = { arc: 0, stroke: 0 };
+    const ctx = {
+      fillStyle: "", strokeStyle: "", lineWidth: 0, globalAlpha: 1, lineCap: "",
+      save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {},
+      arc() { calls.arc++; }, fill() {}, stroke() { calls.stroke++; }, fillRect() {},
+    } as unknown as CanvasRenderingContext2D;
+
+    const fight = createEyeBeams({ ...DEFAULT_EYE_BEAMS, eyeCount: 2 });
+    const player = makeCursor();
+    for (let i = 0; i < 10; i++) fight.update(player, 1 / 120);
+    fight.draw(ctx);
+    expect(calls.arc).toBeGreaterThan(3); // at least a couple of eyes drawn
+  });
+});
