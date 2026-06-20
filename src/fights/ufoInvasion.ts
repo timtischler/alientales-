@@ -1,6 +1,6 @@
 import type { Rng } from "../rng";
 import { createRng } from "../rng";
-import { UFO_COLORS } from "../sprites";
+import { UFO_COLORS, ALIEN, drawSprite, drawUfo, drawBeam } from "../sprites";
 import { rectsOverlap } from "../collision";
 import { ARENA, CURSOR_SIZE, LOGICAL_WIDTH } from "../constants";
 import type { Cursor } from "../movement";
@@ -215,9 +215,21 @@ export function createUfoFight(cfg: UfoFightConfig): Fight {
     return "running";
   }
 
-  function draw(_ctx: CanvasRenderingContext2D): void {
-    // Implemented in Task 6.
-    void alienBob;
+  const ALIEN_PIXEL = 4;
+  const ALIEN_X = Math.round((LOGICAL_WIDTH - ALIEN.w * ALIEN_PIXEL) / 2);
+  const ALIEN_Y = 14;
+
+  function draw(ctx: CanvasRenderingContext2D): void {
+    const bob = Math.sin(alienBob * 3) * 3;
+    drawSprite(ctx, ALIEN, ALIEN_X, ALIEN_Y + bob, ALIEN_PIXEL);
+    for (let i = 0; i < POOL; i++) {
+      const u = ufos[i];
+      if (!u.active) continue;
+      if (u.phase === PHASE_BEAM && u.beamLen > 0) {
+        drawBeam(ctx, u.x + UFO_W / 2, u.y + UFO_H, BEAM_W, u.beamLen, u.color);
+      }
+      drawUfo(ctx, u.x, u.y, UFO_W, UFO_H, u.color);
+    }
   }
 
   return { update, draw, reset };

@@ -113,3 +113,24 @@ describe("createUfoFight beam collision", () => {
     expect(runUntilDone(fight, player, 4000)).toBe("won");
   });
 });
+
+describe("createUfoFight draw", () => {
+  it("draws the alien and active UFOs without throwing", () => {
+    const calls: number[] = [];
+    const ctx = {
+      set fillStyle(_v: string) {},
+      get fillStyle() { return ""; },
+      set globalAlpha(_v: number) {},
+      get globalAlpha() { return 1; },
+      fillRect() { calls.push(1); },
+    } as unknown as CanvasRenderingContext2D;
+
+    const fight = createUfoFight({ ...BASE, count: 1, ufoYMin: 300, ufoYMax: 300 });
+    const player = makeCursor();
+    player.pos.y = 100; // keep player clear so the UFO stays alive a while
+    for (let i = 0; i < 30; i++) fight.update(player, 1 / 120);
+    fight.draw(ctx);
+    // Alien (many cells) + at least one UFO contributes plenty of fillRects.
+    expect(calls.length).toBeGreaterThan(10);
+  });
+});
