@@ -3,7 +3,9 @@ import { makeCursor, stepMovement, resetCursor } from "./movement";
 import { createRenderer } from "./render";
 import { loadMode, saveMode } from "./settings";
 import { FIXED_DT, MAX_FRAME_DT } from "./constants";
-import { createUfoFight, DEFAULT_UFO_FIGHT } from "./fights/ufoInvasion";
+import { UFO_INVASION } from "./fights/ufoInvasion";
+import { createConfigPanel } from "./configPanel";
+import { loadFightConfig, saveFightConfig } from "./fightConfigStore";
 import type { MovementMode } from "./types";
 
 const canvas = document.getElementById("game") as HTMLCanvasElement | null;
@@ -11,11 +13,15 @@ if (canvas === null) throw new Error("missing #game canvas");
 
 const modeSelect = document.getElementById("mode") as HTMLSelectElement | null;
 const victory = document.getElementById("victory");
+const configEl = document.getElementById("fight-config");
 
 const renderer = createRenderer(canvas);
 const input = createInput(window);
 const cursor = makeCursor();
-const fight = createUfoFight(DEFAULT_UFO_FIGHT);
+
+let config = loadFightConfig(localStorage, UFO_INVASION);
+let fight = UFO_INVASION.create(config);
+let won = false;
 
 let mode: MovementMode = loadMode(localStorage);
 if (modeSelect !== null) {
@@ -26,11 +32,21 @@ if (modeSelect !== null) {
   });
 }
 
+if (configEl !== null) {
+  createConfigPanel(configEl, UFO_INVASION, config, (next) => {
+    config = next;
+    saveFightConfig(localStorage, UFO_INVASION, config);
+    fight = UFO_INVASION.create(config);
+    resetCursor(cursor);
+    won = false;
+    if (victory !== null) victory.style.display = "none";
+  });
+}
+
 window.addEventListener("resize", () => renderer.resize());
 
 let last = performance.now();
 let accumulator = 0;
-let won = false;
 
 function frame(now: number): void {
   let dt = (now - last) / 1000;
