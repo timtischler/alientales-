@@ -53,6 +53,20 @@ describe("EyeBeams win", () => {
   });
 });
 
+describe("EyeBeams small homing eyes", () => {
+  it("a homing small eye kills a stationary player", () => {
+    const fight = createEyeBeams({
+      ...DEFAULT_EYE_BEAMS,
+      volleys: 5, eyeCount: 1,
+      eyeFireGapMin: 999, eyeFireGapMax: 999, // no beams during the test
+      orbitRadius: 260, orbitRadiusAmp: 0,    // eyes stay clear of the box
+      smallSpawnGapMin: 0, smallSpawnGapMax: 0,
+      smallSpeed: 120, smallLifetime: 30,
+    });
+    expect(runUntilDone(fight, makeCursor(), 1000).status).toBe("lost");
+  });
+});
+
 describe("EYE_BEAMS definition", () => {
   it("exposes the tunable params, all numeric fields of the defaults", () => {
     expect(EYE_BEAMS.name).toBe("Eye Beams");

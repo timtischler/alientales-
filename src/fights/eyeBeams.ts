@@ -52,6 +52,10 @@ const PHASE_ORBIT = 0;
 const PHASE_TELEGRAPH = 1;
 const PHASE_FIRE = 2;
 
+const SMALL_POOL = 16;
+const SMALL_R = 7;
+const SMALL_SPAWN_RADIUS = 280;
+
 interface Eye {
   active: boolean;
   phaseAngle: number;
@@ -75,10 +79,30 @@ function makeEye(): Eye {
   };
 }
 
+interface SmallEye {
+  active: boolean;
+  x: number;
+  y: number;
+  life: number;
+}
+
+function makeSmall(): SmallEye {
+  return { active: false, x: 0, y: 0, life: 0 };
+}
+
 export function createEyeBeams(cfg: EyeBeamsConfig): Fight {
   const rng = createRng(cfg.seed);
   const eyes: Eye[] = [];
   for (let i = 0; i < MAX_EYES; i++) eyes.push(makeEye());
+
+  const smalls: SmallEye[] = [];
+  for (let i = 0; i < SMALL_POOL; i++) smalls.push(makeSmall());
+  let smallSpawnTimer = 0;
+
+  function freeSmall(): number {
+    for (let i = 0; i < SMALL_POOL; i++) if (!smalls[i].active) return i;
+    return -1;
+  }
 
   let firedVolleys = 0;
 
@@ -107,6 +131,8 @@ export function createEyeBeams(cfg: EyeBeamsConfig): Fight {
         e.active = false;
       }
     }
+    for (let i = 0; i < SMALL_POOL; i++) smalls[i].active = false;
+    smallSpawnTimer = gap(cfg.smallSpawnGapMin, cfg.smallSpawnGapMax);
   }
 
   reset();
@@ -169,6 +195,37 @@ export function createEyeBeams(cfg: EyeBeamsConfig): Fight {
         if (distancePointToSegment(pcx, pcy, e.x, e.y, ex, ey) <= cfg.beamWidth / 2 + PLAYER_R) {
           return "lost";
         }
+      }
+    }
+
+    smallSpawnTimer -= dt;
+    while (smallSpawnTimer <= 0 && firedVolleys < cfg.volleys) {
+      const slot = freeSmall();
+      if (slot === -1) break;
+      const a = rng.next() * Math.PI * 2;
+      const s = smalls[slot];
+      s.active = true;
+      s.x = CX + Math.cos(a) * SMALL_SPAWN_RADIUS;
+      s.y = CY + Math.sin(a) * SMALL_SPAWN_RADIUS;
+      s.life = cfg.smallLifetime;
+      smallSpawnTimer += gap(cfg.smallSpawnGapMin, cfg.smallSpawnGapMax);
+    }
+    for (let i = 0; i < SMALL_POOL; i++) {
+      const s = smalls[i];
+      if (!s.active) continue;
+      const sdx = pcx - s.x;
+      const sdy = pcy - s.y;
+      const slen = Math.hypot(sdx, sdy) || 1;
+      s.x += (sdx / slen) * cfg.smallSpeed * dt;
+      s.y += (sdy / slen) * cfg.smallSpeed * dt;
+      s.life -= dt;
+      if (s.life <= 0) {
+        s.active = false;
+        continue;
+      }
+      if (rectsOverlap(player.pos.x, player.pos.y, CURSOR_SIZE, CURSOR_SIZE,
+        s.x - SMALL_R, s.y - SMALL_R, SMALL_R * 2, SMALL_R * 2)) {
+        return "lost";
       }
     }
 
