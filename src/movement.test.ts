@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { makeCursor, stepMovement } from "./movement";
+import { makeCursor, stepMovement, resetCursor } from "./movement";
 import { ARENA, CURSOR_SIZE, CURSOR_SPEED } from "./constants";
 
 const noInput = { up: false, down: false, left: false, right: false };
@@ -92,5 +92,19 @@ describe("stepMovement accelerated", () => {
     stepMovement(c, noInput, 1 / 120, "accelerated");
     expect(c.vel.x).toBeLessThan(velBefore);
     expect(c.vel.x).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("resetCursor", () => {
+  it("recenters the cursor and zeroes velocity", () => {
+    const c = makeCursor();
+    c.pos.x = 999;
+    c.pos.y = 0;
+    c.vel.x = 50;
+    c.vel.y = -50;
+    resetCursor(c);
+    expect(c.pos.x).toBe(ARENA.x + (ARENA.w - CURSOR_SIZE) / 2);
+    expect(c.pos.y).toBe(ARENA.y + (ARENA.h - CURSOR_SIZE) / 2);
+    expect(c.vel).toEqual({ x: 0, y: 0 });
   });
 });
