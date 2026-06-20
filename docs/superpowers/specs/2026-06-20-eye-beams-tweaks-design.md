@@ -27,25 +27,33 @@ that never enter the player's area**.
 
 ### Mirrored pair
 
-- There are always exactly **two** large eyes: a **driver** and its **mirror**.
-  Remove the `eyeCount` config field and its panel param.
-- The **driver** keeps the existing behavior: it orbits, and on its fire cadence
-  it locks its aim onto the player at telegraph start, telegraphs, and fires
-  (holding position during telegraph + fire).
-- The **mirror** is computed each frame as the driver reflected across the
-  vertical center line `x = CX` (CX = 400):
-  - position `(2*CX - driverX, driverY)`
-  - aim direction `(-driverAimDx, driverAimDy)`
-  - pupil look `(-driverLookDx, driverLookDy)`
-  - it shares the driver's phase and timers (the pair telegraphs and fires in
-    unison).
-- "Full mirror": the driver's beam targets the player; the mirror's beam is the
-  reflected beam (toward the player's mirror position). The mirror beam can still
-  clip the player when they are near the center line. A volley still counts once
-  per pair-fire (driver telegraph→fire), so "survive N volleys" is unchanged.
+There are always exactly **two** large eyes, a mirror-image pair. The `eyeCount`
+config field and its panel param are removed.
 
-The pair traces mirror paths: they spread to opposite sides as the driver orbits
-and pass near each other at the top and bottom of the orbit.
+**Position (fixed mirror).** One eye (`eyes[0]`) runs the orbit; the other
+(`eyes[1]`) is its reflection across the vertical center line `x = CX` (CX = 400)
+every frame: position `(2*CX - x, y)`. Both share the same phase and timers (the
+pair telegraphs and fires in unison). The pair traces mirror paths — spreading to
+opposite sides as the orbit advances and passing near each other at the top and
+bottom.
+
+**Aim (random driver each volley).** Which eye actually targets the player is
+NOT fixed — at each telegraph lock, a seeded coin flip (`rng.next() < 0.5`)
+chooses which of the two eyes is the **aim-driver** for that volley:
+
+- the aim-driver locks its aim onto the player from its own (frozen) position;
+- the partner's aim is the reflection of the driver's aim across the vertical
+  axis: `(-aimDriverAimDx, aimDriverAimDy)` (so it fires toward the player's
+  mirror position).
+
+So from volley to volley it is unpredictable whether the left or the right eye is
+the one hunting you — the other always fires the mirrored beam. The driver's beam
+targets you; the mirror beam can still clip you near the center line. A volley
+still counts once per pair-fire, so "survive N volleys" is unchanged.
+
+**Pupils.** Both eyes' pupils track the player independently every frame
+(`look = unit(playerCenter - eyePos)` per eye) — both visibly watch you,
+regardless of which is the current aim-driver.
 
 ### Kept outside the box
 
@@ -70,9 +78,11 @@ constantly hugging the border: `orbitRadius` ~250, `orbitRadiusAmp` ~70.
 
 ## Determinism & Testing
 
-Still deterministic: only the single driver is seeded (`phaseAngle`,
-`radiusPhase`, `fireTimer`), then the small-eye spawn timer; the mirror is
-derived. `reset()` reseeds.
+Still deterministic: only the single orbiter (`eyes[0]`) is seeded
+(`phaseAngle`, `radiusPhase`, `fireTimer`), then the small-eye spawn timer; the
+mirror eye is derived. Each volley draws one extra seeded value at telegraph lock
+— the coin flip choosing the aim-driver — which is deterministic on the
+fixed-step timeline. `reset()` reseeds.
 
 - Existing tests are updated to drop the removed `eyeCount` override.
 - **Loss by beam** (stationary player, driver locks and fires through them) still
