@@ -79,3 +79,68 @@ export function drawBeam(
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(centerX - w / 2, top + len - 3, w, 3);
 }
+
+export function drawEye(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, r: number,
+  lookDx: number, lookDy: number,
+): void {
+  ctx.fillStyle = "#f4f4ff";
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  const ix = x + lookDx * r * 0.4;
+  const iy = y + lookDy * r * 0.4;
+  ctx.fillStyle = "#7a3cff";
+  ctx.beginPath();
+  ctx.arc(ix, iy, r * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#0a0010";
+  ctx.beginPath();
+  ctx.arc(ix, iy, r * 0.24, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(ix - r * 0.12, iy - r * 0.12, r * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+export function drawSmallEye(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, r: number,
+): void {
+  ctx.fillStyle = "#f4f4ff";
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#c0182b";
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#0a0010";
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.24, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+export function drawBeamLine(
+  ctx: CanvasRenderingContext2D,
+  x1: number, y1: number, x2: number, y2: number,
+  width: number, color: string, alpha: number,
+): void {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.restore();
+}
