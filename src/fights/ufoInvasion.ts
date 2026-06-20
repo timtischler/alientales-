@@ -4,7 +4,7 @@ import { UFO_COLORS, ALIEN, drawSprite, drawUfo, drawBeam } from "../sprites";
 import { rectsOverlap } from "../collision";
 import { ARENA, CURSOR_SIZE, LOGICAL_WIDTH } from "../constants";
 import type { Cursor } from "../movement";
-import type { Fight, FightStatus } from "./types";
+import type { Fight, FightStatus, FightDefinition, FightParam } from "./types";
 
 export interface UfoFightConfig {
   seed: number;
@@ -234,3 +234,20 @@ export function createUfoFight(cfg: UfoFightConfig): Fight {
 
   return { update, draw, reset };
 }
+
+const UFO_PARAMS: readonly FightParam[] = [
+  { key: "seed", label: "Seed", kind: "seed", min: 0, max: 999999, step: 1 },
+  { key: "count", label: "UFO count", kind: "int", min: 1, max: 200, step: 1 },
+  { key: "speedMin", label: "Speed min", kind: "float", min: 10, max: 600, step: 5 },
+  { key: "speedMax", label: "Speed max", kind: "float", min: 10, max: 600, step: 5 },
+  { key: "beamerChance", label: "Beamer chance", kind: "float", min: 0, max: 1, step: 0.05 },
+  { key: "spawnGapMin", label: "Spawn gap min (s)", kind: "float", min: 0, max: 5, step: 0.1 },
+  { key: "spawnGapMax", label: "Spawn gap max (s)", kind: "float", min: 0, max: 5, step: 0.1 },
+];
+
+export const UFO_INVASION: FightDefinition<UfoFightConfig> = {
+  name: "UFO Invasion",
+  params: UFO_PARAMS,
+  defaults: DEFAULT_UFO_FIGHT,
+  create: (config) => createUfoFight(config),
+};

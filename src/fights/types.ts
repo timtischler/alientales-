@@ -7,3 +7,19 @@ export interface Fight {
   draw(ctx: CanvasRenderingContext2D): void;
   reset(): void;
 }
+
+export interface FightParam {
+  key: string;
+  label: string;
+  kind: "int" | "float" | "seed";
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
+export interface FightDefinition<C> {
+  name: string;
+  params: readonly FightParam[];
+  defaults: C;
+  create(config: C): Fight;
+}

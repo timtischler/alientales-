@@ -7,6 +7,7 @@ import { createUfoFight } from "./ufoInvasion";
 import { createRng as createRng2 } from "../rng";
 import { rollUfo as rollUfo2 } from "./ufoInvasion";
 import { makeCursor } from "../movement";
+import { UFO_INVASION } from "./ufoInvasion";
 import type { FightStatus } from "./types";
 import type { Cursor } from "../movement";
 
@@ -132,5 +133,28 @@ describe("createUfoFight draw", () => {
     fight.draw(ctx);
     // Alien (many cells) + at least one UFO contributes plenty of fillRects.
     expect(calls.length).toBeGreaterThan(10);
+  });
+});
+
+describe("UFO_INVASION definition", () => {
+  it("exposes the tunable params in order with defaults", () => {
+    expect(UFO_INVASION.name).toBe("UFO Invasion");
+    expect(UFO_INVASION.defaults).toBe(DEFAULT_UFO_FIGHT);
+    const keys = UFO_INVASION.params.map((p) => p.key);
+    expect(keys).toEqual([
+      "seed", "count", "speedMin", "speedMax", "beamerChance", "spawnGapMin", "spawnGapMax",
+    ]);
+  });
+
+  it("every param key is a numeric field of the defaults", () => {
+    for (const p of UFO_INVASION.params) {
+      expect(typeof (DEFAULT_UFO_FIGHT as unknown as Record<string, unknown>)[p.key]).toBe("number");
+    }
+  });
+
+  it("create() builds a working fight", () => {
+    const fight = UFO_INVASION.create(UFO_INVASION.defaults);
+    const player = makeCursor();
+    expect(fight.update(player, 1 / 120)).toBe("running");
   });
 });
