@@ -63,3 +63,10 @@ export function stepMovement(
   cursor.pos.y += cursor.vel.y * dt;
   clampToArena(cursor);
 }
+
+export function resetCursor(cursor: Cursor): void {
+  cursor.pos.x = ARENA.x + (ARENA.w - CURSOR_SIZE) / 2;
+  cursor.pos.y = ARENA.y + (ARENA.h - CURSOR_SIZE) / 2;
+  cursor.vel.x = 0;
+  cursor.vel.y = 0;
+}

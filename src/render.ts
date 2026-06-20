@@ -2,7 +2,7 @@ import type { Cursor } from "./movement";
 import { ARENA, CURSOR_SIZE, LOGICAL_HEIGHT, LOGICAL_WIDTH } from "./constants";
 
 export interface Renderer {
-  draw(cursor: Cursor): void;
+  draw(cursor: Cursor, drawFight?: (ctx: CanvasRenderingContext2D) => void): void;
   resize(): void;
 }
 
@@ -20,10 +20,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     ctx!.imageSmoothingEnabled = false;
   }
 
-  function draw(cursor: Cursor): void {
+  function draw(
+    cursor: Cursor,
+    drawFight?: (ctx: CanvasRenderingContext2D) => void,
+  ): void {
     ctx!.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
     ctx!.fillStyle = "#000";
     ctx!.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+
+    if (drawFight) drawFight(ctx!);
 
     ctx!.strokeStyle = "#fff";
     ctx!.lineWidth = 2;
