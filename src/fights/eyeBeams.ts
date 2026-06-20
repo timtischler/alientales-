@@ -8,6 +8,7 @@ import { drawEye, drawSmallEye, drawBeamLine } from "../sprites";
 export interface EyeBeamsConfig {
   seed: number;
   volleys: number;
+  pairCount: number;
   orbitSpeed: number;
   orbitRadius: number;
   orbitRadiusAmp: number;
@@ -26,6 +27,7 @@ export interface EyeBeamsConfig {
 export const DEFAULT_EYE_BEAMS: EyeBeamsConfig = {
   seed: 2024,
   volleys: 20,
+  pairCount: 4,
   orbitSpeed: 0.7,
   orbitRadius: 250,
   orbitRadiusAmp: 70,
@@ -54,11 +56,12 @@ const PHASE_ORBIT = 0;
 const PHASE_TELEGRAPH = 1;
 const PHASE_FIRE = 2;
 
+const MAX_PAIRS = 8;
 const MAX_SMALL = 64;
 const SMALL_R = 7;
 const SMALL_SPAWN_RADIUS = 280;
 
-// A rendered eye: position, pupil look direction, and locked beam direction.
+// A rendered eye: position, pupil look, locked beam direction.
 interface Eye {
   x: number;
   y: number;
@@ -70,6 +73,24 @@ interface Eye {
 
 function makeEyeState(): Eye {
   return { x: 0, y: 0, lookDx: 0, lookDy: 1, aimDx: 0, aimDy: 1 };
+}
+
+// A mirrored pair with its own orbit + volley state.
+interface Pair {
+  phaseAngle: number;
+  radiusPhase: number;
+  fireTimer: number;
+  phase: number;
+  stateTimer: number;
+  driver: Eye;
+  mirror: Eye;
+}
+
+function makePair(): Pair {
+  return {
+    phaseAngle: 0, radiusPhase: 0, fireTimer: 0, phase: PHASE_ORBIT, stateTimer: 0,
+    driver: makeEyeState(), mirror: makeEyeState(),
+  };
 }
 
 interface SmallEye {
@@ -86,15 +107,9 @@ function makeSmall(): SmallEye {
 export function createEyeBeams(cfg: EyeBeamsConfig): Fight {
   const rng = createRng(cfg.seed);
 
-  // eyes[0] is the orbiter (drives position + the shared phase); eyes[1] mirrors it.
-  const eyes: Eye[] = [makeEyeState(), makeEyeState()];
-
-  // Orbit/volley state for the orbiter (shared by the pair).
-  let phaseAngle = 0;
-  let radiusPhase = 0;
-  let fireTimer = 0;
-  let phase = PHASE_ORBIT;
-  let stateTimer = 0;
+  const pairs: Pair[] = [];
+  for (let i = 0; i < MAX_PAIRS; i++) pairs.push(makePair());
+  let activePairs = 0;
 
   const smalls: SmallEye[] = [];
   for (let i = 0; i < MAX_SMALL; i++) smalls.push(makeSmall());
@@ -116,22 +131,28 @@ export function createEyeBeams(cfg: EyeBeamsConfig): Fight {
     return n;
   }
 
+  function resetEye(e: Eye): void {
+    e.x = 0;
+    e.y = 0;
+    e.lookDx = 0;
+    e.lookDy = 1;
+    e.aimDx = 0;
+    e.aimDy = 1;
+  }
+
   function reset(): void {
     rng.reseed(cfg.seed);
     firedVolleys = 0;
-    phase = PHASE_ORBIT;
-    stateTimer = 0;
-    phaseAngle = rng.next() * Math.PI * 2;
-    radiusPhase = rng.next() * Math.PI * 2;
-    fireTimer = gap(cfg.eyeFireGapMin, cfg.eyeFireGapMax);
-    for (let i = 0; i < 2; i++) {
-      const e = eyes[i];
-      e.x = 0;
-      e.y = 0;
-      e.lookDx = 0;
-      e.lookDy = 1;
-      e.aimDx = 0;
-      e.aimDy = 1;
+    activePairs = Math.min(cfg.pairCount, MAX_PAIRS);
+    for (let i = 0; i < activePairs; i++) {
+      const p = pairs[i];
+      p.phaseAngle = rng.next() * Math.PI * 2;
+      p.radiusPhase = rng.next() * Math.PI * 2;
+      p.fireTimer = gap(cfg.eyeFireGapMin, cfg.eyeFireGapMax);
+      p.phase = PHASE_ORBIT;
+      p.stateTimer = 0;
+      resetEye(p.driver);
+      resetEye(p.mirror);
     }
     for (let i = 0; i < MAX_SMALL; i++) smalls[i].active = false;
     smallSpawnTimer = gap(cfg.smallSpawnGapMin, cfg.smallSpawnGapMax);
@@ -139,91 +160,90 @@ export function createEyeBeams(cfg: EyeBeamsConfig): Fight {
 
   reset();
 
+  function beamHits(e: Eye, pcx: number, pcy: number): boolean {
+    const ex = e.x + e.aimDx * BEAM_LEN;
+    const ey = e.y + e.aimDy * BEAM_LEN;
+    return distancePointToSegment(pcx, pcy, e.x, e.y, ex, ey) <= cfg.beamWidth / 2 + PLAYER_R;
+  }
+
   function update(player: Cursor, dt: number): FightStatus {
     const pcx = player.pos.x + CURSOR_SIZE / 2;
     const pcy = player.pos.y + CURSOR_SIZE / 2;
 
-    const driver = eyes[0];
-    const mirror = eyes[1];
-
-    // 1. Advance orbit (frozen during telegraph + fire) and clamp outside the box.
-    if (phase === PHASE_ORBIT) {
-      phaseAngle += cfg.orbitSpeed * dt;
-      radiusPhase += RADIUS_OSC_SPEED * dt;
-    }
-    const ca = Math.cos(phaseAngle);
-    const sa = Math.sin(phaseAngle);
-    let r = cfg.orbitRadius + cfg.orbitRadiusAmp * Math.sin(radiusPhase);
-    const minR = 1 / Math.max(Math.abs(ca) / BOX_HALF_X, Math.abs(sa) / BOX_HALF_Y);
-    if (r < minR) r = minR;
-    driver.x = CX + ca * r;
-    driver.y = CY + sa * r;
-
-    // 2. Mirror across the vertical center line.
-    mirror.x = 2 * CX - driver.x;
-    mirror.y = driver.y;
-
-    // 3. Pupils track the player (each eye independently).
-    const dlx = pcx - driver.x;
-    const dly = pcy - driver.y;
-    const dll = Math.hypot(dlx, dly) || 1;
-    driver.lookDx = dlx / dll;
-    driver.lookDy = dly / dll;
-    const mlx = pcx - mirror.x;
-    const mly = pcy - mirror.y;
-    const mll = Math.hypot(mlx, mly) || 1;
-    mirror.lookDx = mlx / mll;
-    mirror.lookDy = mly / mll;
-
-    // 4. Volley state machine. The pair shares one phase, driven by the orbiter.
     let anyBusy = false;
-    if (phase === PHASE_ORBIT) {
-      fireTimer -= dt;
-      if (fireTimer <= 0 && firedVolleys < cfg.volleys) {
-        // Random aim-driver: which eye targets the player flips each volley.
-        const aimEye = rng.next() < 0.5 ? driver : mirror;
-        const partner = aimEye === driver ? mirror : driver;
-        const adx = pcx - aimEye.x;
-        const ady = pcy - aimEye.y;
-        const al = Math.hypot(adx, ady) || 1;
-        aimEye.aimDx = adx / al;
-        aimEye.aimDy = ady / al;
-        partner.aimDx = -aimEye.aimDx; // reflection across the vertical axis
-        partner.aimDy = aimEye.aimDy;
-        phase = PHASE_TELEGRAPH;
-        stateTimer = 0;
-      }
-    } else if (phase === PHASE_TELEGRAPH) {
-      anyBusy = true;
-      stateTimer += dt;
-      if (stateTimer >= cfg.telegraphTime) {
-        phase = PHASE_FIRE;
-        stateTimer = 0;
-        firedVolleys++;
-      }
-    } else {
-      anyBusy = true;
-      stateTimer += dt;
-      if (stateTimer >= cfg.beamTime) {
-        phase = PHASE_ORBIT;
-        fireTimer = gap(cfg.eyeFireGapMin, cfg.eyeFireGapMax);
-      }
-    }
+    for (let pi = 0; pi < activePairs; pi++) {
+      const p = pairs[pi];
+      const driver = p.driver;
+      const mirror = p.mirror;
 
-    // 5. Beam collision (both eyes, while firing). No eye-body collision: the
-    //    radius clamp keeps the eyes outside the box, so they cannot reach the player.
-    if (phase === PHASE_FIRE) {
-      for (let i = 0; i < 2; i++) {
-        const e = eyes[i];
-        const ex = e.x + e.aimDx * BEAM_LEN;
-        const ey = e.y + e.aimDy * BEAM_LEN;
-        if (distancePointToSegment(pcx, pcy, e.x, e.y, ex, ey) <= cfg.beamWidth / 2 + PLAYER_R) {
-          return "lost";
+      // Orbit (frozen during telegraph + fire) and clamp outside the box.
+      if (p.phase === PHASE_ORBIT) {
+        p.phaseAngle += cfg.orbitSpeed * dt;
+        p.radiusPhase += RADIUS_OSC_SPEED * dt;
+      }
+      const ca = Math.cos(p.phaseAngle);
+      const sa = Math.sin(p.phaseAngle);
+      let r = cfg.orbitRadius + cfg.orbitRadiusAmp * Math.sin(p.radiusPhase);
+      const minR = 1 / Math.max(Math.abs(ca) / BOX_HALF_X, Math.abs(sa) / BOX_HALF_Y);
+      if (r < minR) r = minR;
+      driver.x = CX + ca * r;
+      driver.y = CY + sa * r;
+      mirror.x = 2 * CX - driver.x;
+      mirror.y = driver.y;
+
+      // Pupils track the player (each eye independently).
+      const dlx = pcx - driver.x;
+      const dly = pcy - driver.y;
+      const dll = Math.hypot(dlx, dly) || 1;
+      driver.lookDx = dlx / dll;
+      driver.lookDy = dly / dll;
+      const mlx = pcx - mirror.x;
+      const mly = pcy - mirror.y;
+      const mll = Math.hypot(mlx, mly) || 1;
+      mirror.lookDx = mlx / mll;
+      mirror.lookDy = mly / mll;
+
+      // Volley state machine (per pair).
+      if (p.phase === PHASE_ORBIT) {
+        p.fireTimer -= dt;
+        if (p.fireTimer <= 0 && firedVolleys < cfg.volleys) {
+          const aimEye = rng.next() < 0.5 ? driver : mirror;
+          const partner = aimEye === driver ? mirror : driver;
+          const adx = pcx - aimEye.x;
+          const ady = pcy - aimEye.y;
+          const al = Math.hypot(adx, ady) || 1;
+          aimEye.aimDx = adx / al;
+          aimEye.aimDy = ady / al;
+          partner.aimDx = -aimEye.aimDx;
+          partner.aimDy = aimEye.aimDy;
+          p.phase = PHASE_TELEGRAPH;
+          p.stateTimer = 0;
+        }
+      } else if (p.phase === PHASE_TELEGRAPH) {
+        anyBusy = true;
+        p.stateTimer += dt;
+        if (p.stateTimer >= cfg.telegraphTime) {
+          p.phase = PHASE_FIRE;
+          p.stateTimer = 0;
+          firedVolleys++;
+        }
+      } else {
+        anyBusy = true;
+        p.stateTimer += dt;
+        if (p.stateTimer >= cfg.beamTime) {
+          p.phase = PHASE_ORBIT;
+          p.fireTimer = gap(cfg.eyeFireGapMin, cfg.eyeFireGapMax);
         }
       }
+
+      // Beam collision (both eyes of this pair, while firing).
+      if (p.phase === PHASE_FIRE) {
+        if (beamHits(driver, pcx, pcy)) return "lost";
+        if (beamHits(mirror, pcx, pcy)) return "lost";
+      }
     }
 
-    // 6. Small homing eyes, capped at cfg.smallCount alive at once.
+    // Small homing eyes, capped at cfg.smallCount alive at once.
     smallSpawnTimer -= dt;
     while (
       smallSpawnTimer <= 0 &&
@@ -263,17 +283,22 @@ export function createEyeBeams(cfg: EyeBeamsConfig): Fight {
     return "running";
   }
 
+  function drawPairEye(ctx: CanvasRenderingContext2D, p: Pair, e: Eye): void {
+    const ex = e.x + e.aimDx * BEAM_LEN;
+    const ey = e.y + e.aimDy * BEAM_LEN;
+    if (p.phase === PHASE_TELEGRAPH) {
+      drawBeamLine(ctx, e.x, e.y, ex, ey, 3, "#ff5cf0", 0.5);
+    } else if (p.phase === PHASE_FIRE) {
+      drawBeamLine(ctx, e.x, e.y, ex, ey, cfg.beamWidth, "#ff3b6b", 0.85);
+    }
+    drawEye(ctx, e.x, e.y, EYE_R, e.lookDx, e.lookDy);
+  }
+
   function draw(ctx: CanvasRenderingContext2D): void {
-    for (let i = 0; i < 2; i++) {
-      const e = eyes[i];
-      const ex = e.x + e.aimDx * BEAM_LEN;
-      const ey = e.y + e.aimDy * BEAM_LEN;
-      if (phase === PHASE_TELEGRAPH) {
-        drawBeamLine(ctx, e.x, e.y, ex, ey, 3, "#ff5cf0", 0.5);
-      } else if (phase === PHASE_FIRE) {
-        drawBeamLine(ctx, e.x, e.y, ex, ey, cfg.beamWidth, "#ff3b6b", 0.85);
-      }
-      drawEye(ctx, e.x, e.y, EYE_R, e.lookDx, e.lookDy);
+    for (let pi = 0; pi < activePairs; pi++) {
+      const p = pairs[pi];
+      drawPairEye(ctx, p, p.driver);
+      drawPairEye(ctx, p, p.mirror);
     }
     for (let i = 0; i < MAX_SMALL; i++) {
       const s = smalls[i];
@@ -288,6 +313,7 @@ export function createEyeBeams(cfg: EyeBeamsConfig): Fight {
 const EYE_BEAMS_PARAMS: readonly FightParam[] = [
   { key: "seed", label: "Seed", kind: "seed", min: 0, max: 999999, step: 1 },
   { key: "volleys", label: "Volleys", kind: "int", min: 0, max: 200, step: 1 },
+  { key: "pairCount", label: "Eye pairs", kind: "int", min: 1, max: 8, step: 1 },
   { key: "orbitSpeed", label: "Orbit speed", kind: "float", min: 0.1, max: 3, step: 0.1 },
   { key: "telegraphTime", label: "Telegraph (s)", kind: "float", min: 0.1, max: 2, step: 0.05 },
   { key: "beamTime", label: "Beam (s)", kind: "float", min: 0.1, max: 1.5, step: 0.05 },
