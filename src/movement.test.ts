@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { makeCursor, stepMovement } from "./movement";
-import { ARENA, CURSOR_SIZE, CURSOR_SPEED, ACCEL_TIME } from "./constants";
+import { ARENA, CURSOR_SIZE, CURSOR_SPEED } from "./constants";
 
 const noInput = { up: false, down: false, left: false, right: false };
 

@@ -12,6 +12,14 @@
   </head>
   <body>
     <canvas id="game"></canvas>
+    <div id="settings" style="position: fixed; top: 8px; left: 8px; color: #aaa; font: 12px monospace;">
+      <label>Movement:
+        <select id="mode">
+          <option value="digital">Digital (instant)</option>
+          <option value="accelerated">Accelerated</option>
+        </select>
+      </label>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
