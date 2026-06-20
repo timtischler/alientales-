@@ -1,5 +1,5 @@
 import type { InputState, MovementMode, Vec2 } from "./types";
-import { ARENA, CURSOR_SIZE, CURSOR_SPEED } from "./constants";
+import { ARENA, CURSOR_SIZE, CURSOR_SPEED, ACCEL_TIME } from "./constants";
 
 export interface Cursor {
   pos: Vec2;
@@ -25,6 +25,12 @@ function clampToArena(cursor: Cursor): void {
   else if (cursor.pos.y > maxY) cursor.pos.y = maxY;
 }
 
+function approach(current: number, target: number, maxDelta: number): number {
+  if (current < target) return Math.min(current + maxDelta, target);
+  if (current > target) return Math.max(current - maxDelta, target);
+  return target;
+}
+
 export function stepMovement(
   cursor: Cursor,
   input: InputState,
@@ -46,9 +52,11 @@ export function stepMovement(
     cursor.vel.x = dirX * CURSOR_SPEED;
     cursor.vel.y = dirY * CURSOR_SPEED;
   } else {
-    // Accelerated mode implemented in Task 4.
-    cursor.vel.x = dirX * CURSOR_SPEED;
-    cursor.vel.y = dirY * CURSOR_SPEED;
+    const targetX = dirX * CURSOR_SPEED;
+    const targetY = dirY * CURSOR_SPEED;
+    const maxDelta = (CURSOR_SPEED / ACCEL_TIME) * dt;
+    cursor.vel.x = approach(cursor.vel.x, targetX, maxDelta);
+    cursor.vel.y = approach(cursor.vel.y, targetY, maxDelta);
   }
 
   cursor.pos.x += cursor.vel.x * dt;

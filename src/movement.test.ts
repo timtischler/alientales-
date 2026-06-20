@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { makeCursor, stepMovement } from "./movement";
-import { ARENA, CURSOR_SIZE, CURSOR_SPEED } from "./constants";
+import { ARENA, CURSOR_SIZE, CURSOR_SPEED, ACCEL_TIME } from "./constants";
 
 const noInput = { up: false, down: false, left: false, right: false };
 
@@ -61,5 +61,36 @@ describe("stepMovement digital", () => {
     const c = makeCursor();
     stepMovement(c, { ...noInput, up: true }, 100, "digital");
     expect(c.pos.y).toBe(ARENA.y);
+  });
+});
+
+describe("stepMovement accelerated", () => {
+  it("does not reach full speed instantly", () => {
+    const c = makeCursor();
+    const startX = c.pos.x;
+    // One short step: should move less than full-speed distance.
+    stepMovement(c, { up: false, down: false, left: false, right: true }, 0.02, "accelerated");
+    const moved = c.pos.x - startX;
+    expect(moved).toBeLessThan(CURSOR_SPEED * 0.02);
+    expect(moved).toBeGreaterThan(0);
+  });
+
+  it("ramps up to full speed after ACCEL_TIME of holding", () => {
+    const c = makeCursor();
+    const input = { up: false, down: false, left: false, right: true };
+    // Advance well past ACCEL_TIME in small steps.
+    for (let i = 0; i < 60; i++) stepMovement(c, input, 1 / 120, "accelerated");
+    expect(c.vel.x).toBeCloseTo(CURSOR_SPEED, 1);
+  });
+
+  it("decelerates toward zero on release", () => {
+    const c = makeCursor();
+    const input = { up: false, down: false, left: false, right: true };
+    for (let i = 0; i < 60; i++) stepMovement(c, input, 1 / 120, "accelerated");
+    const noInput = { up: false, down: false, left: false, right: false };
+    const velBefore = c.vel.x;
+    stepMovement(c, noInput, 1 / 120, "accelerated");
+    expect(c.vel.x).toBeLessThan(velBefore);
+    expect(c.vel.x).toBeGreaterThanOrEqual(0);
   });
 });
