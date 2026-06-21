@@ -39,10 +39,11 @@ export const DEFAULT_SAUCER_RING: SaucerRingConfig = {
 const CX = ARENA.x + ARENA.w / 2;
 const CY = ARENA.y + ARENA.h / 2;
 const WORLD_R = 285;
-const ALIEN_R = WORLD_R - 20;
+const ALIEN_INSET = 50; // pull saucers inward from the green ring
+const ALIEN_R = WORLD_R - ALIEN_INSET;
 const PLAYER_R = CURSOR_SIZE / 2;
-const UFO_W = 40;
-const UFO_H = 16;
+const UFO_W = 28;
+const UFO_H = 11;
 const SHOT_R = 5;
 const MAX_ALIENS = 8;
 const MAX_SHOTS = 64;
@@ -56,8 +57,8 @@ const SAUCER_FRAMES: readonly { sx: number; sy: number; sw: number; sh: number }
   { sx: 685, sy: 84, sw: 84, sh: 94 },
 ];
 const FRAME_DUR = 0.18;
-const SAUCER_DRAW_W = 46;
-const SAUCER_DRAW_H = 34;
+const SAUCER_DRAW_W = 32;
+const SAUCER_DRAW_H = 24;
 
 // One shared sheet image for all instances. Guarded so node/test envs (no DOM)
 // fall back to the procedural saucer.
@@ -243,8 +244,13 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
       }
       if (sheetReady && sheet !== null) {
         const f = SAUCER_FRAMES[Math.floor(animClock / FRAME_DUR) % SAUCER_FRAMES.length];
+        // Rotate so the sprite's bottom points inward, toward the ring center.
+        ctx.save();
+        ctx.translate(a.x, a.y);
+        ctx.rotate(a.angle + Math.PI / 2);
         ctx.drawImage(sheet, f.sx, f.sy, f.sw, f.sh,
-          a.x - SAUCER_DRAW_W / 2, a.y - SAUCER_DRAW_H / 2, SAUCER_DRAW_W, SAUCER_DRAW_H);
+          -SAUCER_DRAW_W / 2, -SAUCER_DRAW_H / 2, SAUCER_DRAW_W, SAUCER_DRAW_H);
+        ctx.restore();
       } else {
         drawUfo(ctx, a.x - UFO_W / 2, a.y - UFO_H / 2, UFO_W, UFO_H, "#40c4ff");
       }
