@@ -325,7 +325,9 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
       ctx.save();
       ctx.translate(cowX, cowY);
       ctx.rotate(c.angle - Math.PI / 2);
-      drawCow(ctx, 0, 0, COW_SCALE, c.dir, c.graze, stride);
+      // facing = -dir so the head leads the direction of travel (the local +x
+      // head maps to the trailing side under rotate(angle - PI/2)).
+      drawCow(ctx, 0, 0, COW_SCALE, -c.dir, c.graze, stride);
       ctx.restore();
     }
 
