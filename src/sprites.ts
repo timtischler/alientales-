@@ -207,3 +207,31 @@ export function drawCow(
   ctx.fillStyle = "#f7b6c2";
   ctx.fillRect(headX + f * 1.5 * s, headY - 1 * s, 2.2 * s, 2.4 * s);
 }
+
+// Draws a beam as `segments` collinear sub-segments, each via drawBeamLine,
+// with alpha interpolated from alphaNear (the x1,y1 end) to alphaFar (the x2,y2
+// end). Used for the tractor beam's smooth pull-in gradient. Allocation-free
+// (scalar loop) and mock-ctx friendly (only drawBeamLine).
+export function drawBeamGradient(
+  ctx: CanvasRenderingContext2D,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  width: number,
+  color: string,
+  alphaNear: number,
+  alphaFar: number,
+  segments: number,
+): void {
+  for (let i = 0; i < segments; i++) {
+    const t0 = i / segments;
+    const t1 = (i + 1) / segments;
+    const sx = x1 + (x2 - x1) * t0;
+    const sy = y1 + (y2 - y1) * t0;
+    const ex = x1 + (x2 - x1) * t1;
+    const ey = y1 + (y2 - y1) * t1;
+    const a = alphaNear + (alphaFar - alphaNear) * ((t0 + t1) * 0.5);
+    drawBeamLine(ctx, sx, sy, ex, ey, width, color, a);
+  }
+}

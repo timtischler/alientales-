@@ -144,3 +144,25 @@ describe("drawCow", () => {
     expect(() => drawCow(ctx, 5, 5, 1.2, -1, 1, 1)).not.toThrow();
   });
 });
+
+import { drawBeamGradient } from "./sprites";
+
+describe("drawBeamGradient", () => {
+  it("strokes once per segment with alpha ramping from near to far", () => {
+    let strokes = 0;
+    const alphas: number[] = [];
+    let alpha = 1;
+    const ctx = {
+      save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {},
+      set globalAlpha(v: number) { alpha = v; },
+      get globalAlpha() { return alpha; },
+      set strokeStyle(_v: string) {},
+      set lineWidth(_v: number) {},
+      set lineCap(_v: string) {},
+      stroke() { strokes++; alphas.push(alpha); },
+    } as unknown as CanvasRenderingContext2D;
+    drawBeamGradient(ctx, 0, 0, 100, 0, 10, "#ff3b6b", 0.8, 0.0, 5);
+    expect(strokes).toBe(5);
+    expect(alphas[0]).toBeGreaterThan(alphas[alphas.length - 1]);
+  });
+});
