@@ -3,7 +3,7 @@ import { rectsOverlap, distancePointToSegment } from "../collision";
 import { ARENA, CURSOR_SIZE } from "../constants";
 import type { Cursor } from "../movement";
 import type { Fight, FightStatus, FightDefinition, FightParam } from "./types";
-import { drawUfo, drawBeamLine, drawCow } from "../sprites";
+import { drawUfo, drawBeamLine, drawCow, drawBeamGradient } from "../sprites";
 import alienSpriteUrl from "../../images/alien_sprite.jpeg";
 
 export interface SaucerRingConfig {
@@ -20,6 +20,7 @@ export interface SaucerRingConfig {
   beamTime: number;
   beamWidth: number;
   cowCount: number;
+  beamChunks: number;
 }
 
 export const DEFAULT_SAUCER_RING: SaucerRingConfig = {
@@ -33,9 +34,10 @@ export const DEFAULT_SAUCER_RING: SaucerRingConfig = {
   tractorGapMin: 3,
   tractorGapMax: 6,
   telegraphTime: 0.6,
-  beamTime: 0.4,
+  beamTime: 2.0,
   beamWidth: 24,
   cowCount: 5,
+  beamChunks: 20,
 };
 
 const CX = ARENA.x + ARENA.w / 2;
@@ -107,7 +109,11 @@ if (typeof Image !== "undefined") {
 
 const PHASE_ORBIT = 0;
 const PHASE_TELEGRAPH = 1;
-const PHASE_FIRE = 2;
+const PHASE_EXTEND = 2;
+const PHASE_HOLD = 3;
+const PHASE_RETRACT = 4;
+const BEAM_HOLD = 0.3; // seconds at full length before retracting
+const BEAM_RETRACT = 0.6; // seconds to fully pull in
 
 interface Alien {
   angle: number;
@@ -119,10 +125,11 @@ interface Alien {
   tractorTimer: number;
   phase: number;
   stateTimer: number;
+  beamLen: number; // current tractor beam length; 0 when not firing
 }
 
 function makeAlien(): Alien {
-  return { angle: 0, x: 0, y: 0, idx: 0, idy: 0, shotTimer: 0, tractorTimer: 0, phase: PHASE_ORBIT, stateTimer: 0 };
+  return { angle: 0, x: 0, y: 0, idx: 0, idy: 0, shotTimer: 0, tractorTimer: 0, phase: PHASE_ORBIT, stateTimer: 0, beamLen: 0 };
 }
 
 interface Shot {
@@ -265,24 +272,50 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
         anyBusy = true;
         a.stateTimer += dt;
         if (a.stateTimer >= cfg.telegraphTime) {
-          a.phase = PHASE_FIRE;
+          a.phase = PHASE_EXTEND;
           a.stateTimer = 0;
+          a.beamLen = 0;
           firedVolleys++;
         }
-      } else {
+      } else if (a.phase === PHASE_EXTEND) {
         anyBusy = true;
         a.stateTimer += dt;
+        const chunkTime = cfg.beamTime / cfg.beamChunks;
+        let chunk = 1 + Math.floor(a.stateTimer / chunkTime);
+        if (chunk > cfg.beamChunks) chunk = cfg.beamChunks;
+        a.beamLen = (chunk / cfg.beamChunks) * (2 * ALIEN_R);
         if (a.stateTimer >= cfg.beamTime) {
+          a.phase = PHASE_HOLD;
+          a.stateTimer = 0;
+          a.beamLen = 2 * ALIEN_R;
+        }
+      } else if (a.phase === PHASE_HOLD) {
+        anyBusy = true;
+        a.beamLen = 2 * ALIEN_R;
+        a.stateTimer += dt;
+        if (a.stateTimer >= BEAM_HOLD) {
+          a.phase = PHASE_RETRACT;
+          a.stateTimer = 0;
+        }
+      } else if (a.phase === PHASE_RETRACT) {
+        anyBusy = true;
+        a.stateTimer += dt;
+        const frac = Math.max(0, 1 - a.stateTimer / BEAM_RETRACT);
+        a.beamLen = frac * (2 * ALIEN_R);
+        if (a.stateTimer >= BEAM_RETRACT) {
           a.phase = PHASE_ORBIT;
+          a.beamLen = 0;
           a.tractorTimer = gap(cfg.tractorGapMin, cfg.tractorGapMax);
         }
       }
 
-      if (a.phase === PHASE_FIRE) {
-        const ex = a.x + a.idx * 2 * ALIEN_R;
-        const ey = a.y + a.idy * 2 * ALIEN_R;
-        if (distancePointToSegment(pcx, pcy, a.x, a.y, ex, ey) <= cfg.beamWidth / 2 + PLAYER_R) {
-          return "lost";
+      if (a.phase === PHASE_EXTEND || a.phase === PHASE_HOLD || a.phase === PHASE_RETRACT) {
+        if (a.beamLen > 0) {
+          const ex = a.x + a.idx * a.beamLen;
+          const ey = a.y + a.idy * a.beamLen;
+          if (distancePointToSegment(pcx, pcy, a.x, a.y, ex, ey) <= cfg.beamWidth / 2 + PLAYER_R) {
+            return "lost";
+          }
         }
       }
     }
@@ -333,12 +366,18 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
 
     for (let i = 0; i < activeAliens; i++) {
       const a = aliens[i];
-      const ex = a.x + a.idx * 2 * ALIEN_R;
-      const ey = a.y + a.idy * 2 * ALIEN_R;
       if (a.phase === PHASE_TELEGRAPH) {
-        drawBeamLine(ctx, a.x, a.y, ex, ey, 3, "#ff5cf0", 0.5);
-      } else if (a.phase === PHASE_FIRE) {
-        drawBeamLine(ctx, a.x, a.y, ex, ey, cfg.beamWidth, "#ff3b6b", 0.85);
+        const tex = a.x + a.idx * 2 * ALIEN_R;
+        const tey = a.y + a.idy * 2 * ALIEN_R;
+        drawBeamLine(ctx, a.x, a.y, tex, tey, 3, "#ff5cf0", 0.5);
+      } else if (a.beamLen > 0) {
+        const bex = a.x + a.idx * a.beamLen;
+        const bey = a.y + a.idy * a.beamLen;
+        if (a.phase === PHASE_RETRACT) {
+          drawBeamGradient(ctx, a.x, a.y, bex, bey, cfg.beamWidth, "#ff3b6b", 0.85, 0.0, 10);
+        } else {
+          drawBeamLine(ctx, a.x, a.y, bex, bey, cfg.beamWidth, "#ff3b6b", 0.85);
+        }
       }
       if (sheetReady && sheet !== null) {
         const f = SAUCER_FRAMES[Math.floor(animClock / FRAME_DUR) % SAUCER_FRAMES.length];
@@ -378,9 +417,10 @@ const SAUCER_RING_PARAMS: readonly FightParam[] = [
   { key: "tractorGapMin", label: "Tractor gap min (s)", kind: "float", min: 0, max: 12, step: 0.5 },
   { key: "tractorGapMax", label: "Tractor gap max (s)", kind: "float", min: 0, max: 12, step: 0.5 },
   { key: "telegraphTime", label: "Telegraph (s)", kind: "float", min: 0.1, max: 2, step: 0.05 },
-  { key: "beamTime", label: "Beam (s)", kind: "float", min: 0.1, max: 1.5, step: 0.05 },
+  { key: "beamTime", label: "Beam extend (s)", kind: "float", min: 0.1, max: 6, step: 0.1 },
   { key: "beamWidth", label: "Beam width", kind: "float", min: 6, max: 80, step: 2 },
   { key: "cowCount", label: "Cows", kind: "int", min: 0, max: 12, step: 1 },
+  { key: "beamChunks", label: "Beam chunks", kind: "int", min: 1, max: 60, step: 1 },
 ];
 
 export const SAUCER_RING: FightDefinition<SaucerRingConfig> = {

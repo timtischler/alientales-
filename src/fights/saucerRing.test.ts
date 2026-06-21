@@ -94,7 +94,7 @@ describe("SAUCER_RING definition", () => {
     expect(SAUCER_RING.params.map((p) => p.key)).toEqual([
       "seed", "volleys", "alienCount", "orbitSpeed", "shotGapMin", "shotGapMax",
       "shotSpeed", "tractorGapMin", "tractorGapMax", "telegraphTime", "beamTime", "beamWidth",
-      "cowCount",
+      "cowCount", "beamChunks",
     ]);
     for (const p of SAUCER_RING.params) {
       expect(typeof (DEFAULT_SAUCER_RING as unknown as Record<string, unknown>)[p.key]).toBe("number");
@@ -180,5 +180,29 @@ describe("SaucerRing cow behavior", () => {
     const a = createSaucerRing(cfg);
     const b = createSaucerRing(cfg);
     expect(cowTransformLog(a, makeCursor(), 800)).toEqual(cowTransformLog(b, makeCursor(), 800));
+  });
+});
+
+describe("SaucerRing chunked tractor beam", () => {
+  it("does not damage a centered player until the beam extends past center", () => {
+    const fight = createSaucerRing({
+      ...DEFAULT_SAUCER_RING,
+      alienCount: 1,
+      volleys: 1,
+      shotGapMin: 999, shotGapMax: 999,   // no little shots
+      tractorGapMin: 0, tractorGapMax: 0, // tractor fires immediately
+      telegraphTime: 0.1,
+      beamTime: 1.0,                       // slow extend (~1s to cross)
+      beamChunks: 20,
+    });
+    const p = makeCursor();
+    // ~0.25s in: telegraph done + only the first few chunks -> beam well short
+    // of center -> centered player still safe.
+    let status: FightStatus = "running";
+    for (let i = 0; i < 30; i++) status = fight.update(p, 1 / 120);
+    expect(status).toBe("running");
+    // Keep going until the beam grows past center -> centered player is hit.
+    for (let i = 0; i < 120 && status === "running"; i++) status = fight.update(p, 1 / 120);
+    expect(status).toBe("lost");
   });
 });
