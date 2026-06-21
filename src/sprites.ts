@@ -128,6 +128,79 @@ export function drawSmallEye(
   ctx.fill();
 }
 
+// Perspective tunnel: concentric polygon rings receding to a vanishing point at
+// (cx, cy), with radial spokes joining the rim vertices. Stroke-only vector web.
+export function drawTunnel(
+  ctx: CanvasRenderingContext2D,
+  cx: number, cy: number, rimRadius: number,
+  lanes: number, rings: number,
+): void {
+  if (lanes < 3 || rings < 1) return;
+  ctx.save();
+  ctx.lineJoin = "round";
+
+  function ringPath(radius: number): void {
+    ctx.beginPath();
+    for (let i = 0; i < lanes; i++) {
+      const a = (i / lanes) * Math.PI * 2;
+      const x = cx + Math.cos(a) * radius;
+      const y = cy + Math.sin(a) * radius;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+
+  ctx.strokeStyle = "#16314e";
+  ctx.lineWidth = 1.5;
+  for (let r = 1; r < rings; r++) {
+    ringPath(rimRadius * (r / rings));
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = "#1c476f";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < lanes; i++) {
+    const a = (i / lanes) * Math.PI * 2;
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * rimRadius, cy + Math.sin(a) * rimRadius);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = "#46b4ff";
+  ctx.lineWidth = 2.5;
+  ringPath(rimRadius);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// A "flipper"-style monster: two triangles meeting at the center, pointing
+// outward (toward the rim). One fill + one outline stroke.
+export function drawTempestMonster(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, size: number,
+  angle: number, color: string,
+): void {
+  const s = size / 2;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.beginPath();
+  ctx.moveTo(-s, -s);
+  ctx.lineTo(s, 0);
+  ctx.lineTo(-s, s);
+  ctx.lineTo(-s * 0.35, 0);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = Math.max(1, size * 0.06);
+  ctx.stroke();
+  ctx.restore();
+}
+
 // Rough rock outline: a closed polygon whose vertices are pushed in/out by
 // per-asteroid radius multipliers, rotated by `rotation`. Stroke only — vector art.
 export function drawAsteroid(
