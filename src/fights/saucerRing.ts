@@ -4,6 +4,7 @@ import { ARENA, CURSOR_SIZE } from "../constants";
 import type { Cursor } from "../movement";
 import type { Fight, FightStatus, FightDefinition, FightParam } from "./types";
 import { drawUfo, drawBeamLine } from "../sprites";
+import alienSpriteUrl from "../../images/alien_sprite.jpeg";
 
 export interface SaucerRingConfig {
   seed: number;
@@ -45,6 +46,30 @@ const UFO_H = 16;
 const SHOT_R = 5;
 const MAX_ALIENS = 8;
 const MAX_SHOTS = 64;
+
+// Blue/orange saucer (top sprite row, third group of three frames) on the
+// 1024x559 sheet. Starting cell coordinates from the grid (cols ~83px, rows
+// ~94px under an ~84px title/header band); fine-tune live so each cell centers.
+const SAUCER_FRAMES: readonly { sx: number; sy: number; sw: number; sh: number }[] = [
+  { sx: 518, sy: 84, sw: 84, sh: 94 },
+  { sx: 601, sy: 84, sw: 84, sh: 94 },
+  { sx: 685, sy: 84, sw: 84, sh: 94 },
+];
+const FRAME_DUR = 0.18;
+const SAUCER_DRAW_W = 46;
+const SAUCER_DRAW_H = 34;
+
+// One shared sheet image for all instances. Guarded so node/test envs (no DOM)
+// fall back to the procedural saucer.
+let sheet: HTMLImageElement | null = null;
+let sheetReady = false;
+if (typeof Image !== "undefined") {
+  sheet = new Image();
+  sheet.onload = () => {
+    sheetReady = true;
+  };
+  sheet.src = alienSpriteUrl;
+}
 
 const PHASE_ORBIT = 0;
 const PHASE_TELEGRAPH = 1;
@@ -89,6 +114,7 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
   for (let i = 0; i < MAX_SHOTS; i++) shots.push(makeShot());
 
   let firedVolleys = 0;
+  let animClock = 0;
 
   function gap(min: number, max: number): number {
     return min + rng.next() * (max - min);
@@ -119,6 +145,7 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
   function update(player: Cursor, dt: number): FightStatus {
     const pcx = player.pos.x + CURSOR_SIZE / 2;
     const pcy = player.pos.y + CURSOR_SIZE / 2;
+    animClock += dt;
 
     let anyBusy = false;
     for (let i = 0; i < activeAliens; i++) {
@@ -214,7 +241,13 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
       } else if (a.phase === PHASE_FIRE) {
         drawBeamLine(ctx, a.x, a.y, ex, ey, cfg.beamWidth, "#ff3b6b", 0.85);
       }
-      drawUfo(ctx, a.x - UFO_W / 2, a.y - UFO_H / 2, UFO_W, UFO_H, "#40c4ff");
+      if (sheetReady && sheet !== null) {
+        const f = SAUCER_FRAMES[Math.floor(animClock / FRAME_DUR) % SAUCER_FRAMES.length];
+        ctx.drawImage(sheet, f.sx, f.sy, f.sw, f.sh,
+          a.x - SAUCER_DRAW_W / 2, a.y - SAUCER_DRAW_H / 2, SAUCER_DRAW_W, SAUCER_DRAW_H);
+      } else {
+        drawUfo(ctx, a.x - UFO_W / 2, a.y - UFO_H / 2, UFO_W, UFO_H, "#40c4ff");
+      }
     }
 
     for (let i = 0; i < MAX_SHOTS; i++) {
