@@ -26,7 +26,7 @@ function countSaucers(fight: { draw: (ctx: CanvasRenderingContext2D) => void }):
     get fillStyle() { return fill; },
     strokeStyle: "", lineWidth: 0, globalAlpha: 1, lineCap: "",
     save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {},
-    arc() {}, fill() {}, stroke() {},
+    arc() {}, fill() {}, stroke() {}, translate() {}, rotate() {},
     fillRect() { if (fill === "#cfe8ff") domes++; },
   } as unknown as CanvasRenderingContext2D;
   fight.draw(ctx);
@@ -94,9 +94,36 @@ describe("SAUCER_RING definition", () => {
     expect(SAUCER_RING.params.map((p) => p.key)).toEqual([
       "seed", "volleys", "alienCount", "orbitSpeed", "shotGapMin", "shotGapMax",
       "shotSpeed", "tractorGapMin", "tractorGapMax", "telegraphTime", "beamTime", "beamWidth",
+      "cowCount",
     ]);
     for (const p of SAUCER_RING.params) {
       expect(typeof (DEFAULT_SAUCER_RING as unknown as Record<string, unknown>)[p.key]).toBe("number");
     }
+  });
+});
+
+function countCows(fight: { draw: (ctx: CanvasRenderingContext2D) => void }): number {
+  let cows = 0;
+  let fill = "";
+  const ctx = {
+    set fillStyle(v: string) { fill = v; },
+    get fillStyle() { return fill; },
+    strokeStyle: "", lineWidth: 0, globalAlpha: 1, lineCap: "",
+    save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {},
+    arc() {}, fill() {}, stroke() {}, translate() {}, rotate() {},
+    fillRect() { if (fill === "#f7b6c2") cows++; },
+  } as unknown as CanvasRenderingContext2D;
+  fight.draw(ctx);
+  return cows;
+}
+
+describe("SaucerRing cow count", () => {
+  it("draws one cow per cowCount, and none when zero", () => {
+    const player = makeCursor();
+    const four = createSaucerRing({ ...DEFAULT_SAUCER_RING, cowCount: 4, volleys: 0, shotGapMin: 999, shotGapMax: 999 });
+    const none = createSaucerRing({ ...DEFAULT_SAUCER_RING, cowCount: 0, volleys: 0, shotGapMin: 999, shotGapMax: 999 });
+    for (let i = 0; i < 5; i++) { four.update(player, 1 / 120); none.update(player, 1 / 120); }
+    expect(countCows(four)).toBe(4);
+    expect(countCows(none)).toBe(0);
   });
 });

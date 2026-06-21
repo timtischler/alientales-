@@ -3,7 +3,7 @@ import { rectsOverlap, distancePointToSegment } from "../collision";
 import { ARENA, CURSOR_SIZE } from "../constants";
 import type { Cursor } from "../movement";
 import type { Fight, FightStatus, FightDefinition, FightParam } from "./types";
-import { drawUfo, drawBeamLine } from "../sprites";
+import { drawUfo, drawBeamLine, drawCow } from "../sprites";
 import alienSpriteUrl from "../../images/alien_sprite.jpeg";
 
 export interface SaucerRingConfig {
@@ -19,6 +19,7 @@ export interface SaucerRingConfig {
   telegraphTime: number;
   beamTime: number;
   beamWidth: number;
+  cowCount: number;
 }
 
 export const DEFAULT_SAUCER_RING: SaucerRingConfig = {
@@ -34,6 +35,7 @@ export const DEFAULT_SAUCER_RING: SaucerRingConfig = {
   telegraphTime: 0.6,
   beamTime: 0.4,
   beamWidth: 24,
+  cowCount: 5,
 };
 
 const CX = ARENA.x + ARENA.w / 2;
@@ -47,6 +49,40 @@ const UFO_H = 11;
 const SHOT_R = 5;
 const MAX_ALIENS = 8;
 const MAX_SHOTS = 64;
+
+// --- Cows (decoration) ---
+const COW_R = WORLD_R - 16; // body-center orbit radius; feet ride just inside the ring
+const MAX_COWS = 12;
+const COW_SCALE = 1.1;
+const COW_SPEED = 18; // linear px/s along the ring
+const COW_DECISION_GAP_MIN = 2.0;
+const COW_DECISION_GAP_MAX = 5.0;
+const COW_GRAZE_MIN = 1.5;
+const COW_GRAZE_MAX = 4.0;
+const COW_TURN_CHANCE = 0.5;
+const COW_GRAZE_EASE = 6; // head ease toward target (per s)
+const COW_STRIDE_RATE = 6; // stride phase units per s
+const COW_STATE_WALK = 0;
+const COW_STATE_GRAZE = 1; // used in Task 3 (cow motion)
+const COW_RNG_OFFSET = 70000;
+// Task-3 constants — referenced here to satisfy noUnusedLocals until motion is added
+void COW_GRAZE_MIN; void COW_GRAZE_MAX; void COW_TURN_CHANCE;
+void COW_GRAZE_EASE; void COW_STRIDE_RATE; void COW_STATE_GRAZE;
+
+interface Cow {
+  active: boolean;
+  angle: number;
+  dir: number;
+  speed: number;
+  state: number;
+  stateTimer: number;
+  graze: number;
+  stridePhase: number;
+}
+
+function makeCow(): Cow {
+  return { active: false, angle: 0, dir: 1, speed: 0, state: COW_STATE_WALK, stateTimer: 0, graze: 0, stridePhase: 0 };
+}
 
 // Blue/orange saucer (top sprite row, third group of three frames) on the
 // 1024x559 sheet. Starting cell coordinates from the grid (cols ~83px, rows
@@ -114,11 +150,20 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
   const shots: Shot[] = [];
   for (let i = 0; i < MAX_SHOTS; i++) shots.push(makeShot());
 
+  const cowRng = createRng(cfg.seed + COW_RNG_OFFSET);
+  const cows: Cow[] = [];
+  for (let i = 0; i < MAX_COWS; i++) cows.push(makeCow());
+  let activeCows = 0;
+
   let firedVolleys = 0;
   let animClock = 0;
 
   function gap(min: number, max: number): number {
     return min + rng.next() * (max - min);
+  }
+
+  function cowGap(min: number, max: number): number {
+    return min + cowRng.next() * (max - min);
   }
 
   function freeShot(): number {
@@ -139,6 +184,20 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
       a.stateTimer = 0;
     }
     for (let i = 0; i < MAX_SHOTS; i++) shots[i].active = false;
+    cowRng.reseed(cfg.seed + COW_RNG_OFFSET);
+    activeCows = Math.min(cfg.cowCount, MAX_COWS);
+    for (let i = 0; i < activeCows; i++) {
+      const c = cows[i];
+      c.active = true;
+      c.angle = cowRng.next() * Math.PI * 2;
+      c.dir = cowRng.next() < 0.5 ? -1 : 1;
+      c.speed = COW_SPEED;
+      c.state = COW_STATE_WALK;
+      c.stateTimer = cowGap(COW_DECISION_GAP_MIN, COW_DECISION_GAP_MAX);
+      c.graze = 0;
+      c.stridePhase = cowRng.next() * 1000;
+    }
+    for (let i = activeCows; i < MAX_COWS; i++) cows[i].active = false;
   }
 
   reset();
@@ -233,6 +292,20 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
     ctx.arc(CX, CY, WORLD_R, 0, Math.PI * 2);
     ctx.stroke();
 
+    for (let i = 0; i < activeCows; i++) {
+      const c = cows[i];
+      const ca = Math.cos(c.angle);
+      const sa = Math.sin(c.angle);
+      const cx = CX + ca * COW_R;
+      const cy = CY + sa * COW_R;
+      const stride = c.state === COW_STATE_WALK ? (Math.floor(c.stridePhase) & 1) : 0;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(c.angle - Math.PI / 2);
+      drawCow(ctx, 0, 0, COW_SCALE, c.dir, c.graze, stride);
+      ctx.restore();
+    }
+
     for (let i = 0; i < activeAliens; i++) {
       const a = aliens[i];
       const ex = a.x + a.idx * 2 * ALIEN_R;
@@ -282,6 +355,7 @@ const SAUCER_RING_PARAMS: readonly FightParam[] = [
   { key: "telegraphTime", label: "Telegraph (s)", kind: "float", min: 0.1, max: 2, step: 0.05 },
   { key: "beamTime", label: "Beam (s)", kind: "float", min: 0.1, max: 1.5, step: 0.05 },
   { key: "beamWidth", label: "Beam width", kind: "float", min: 6, max: 80, step: 2 },
+  { key: "cowCount", label: "Cows", kind: "int", min: 0, max: 12, step: 1 },
 ];
 
 export const SAUCER_RING: FightDefinition<SaucerRingConfig> = {
