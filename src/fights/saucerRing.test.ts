@@ -127,3 +127,58 @@ describe("SaucerRing cow count", () => {
     expect(countCows(none)).toBe(0);
   });
 });
+
+function cowTransformLog(
+  fight: { update: (p: Cursor, dt: number) => FightStatus; draw: (ctx: CanvasRenderingContext2D) => void },
+  player: Cursor,
+  steps: number,
+): string[] {
+  for (let i = 0; i < steps; i++) fight.update(player, 1 / 120);
+  const log: string[] = [];
+  const ctx = {
+    set fillStyle(_v: string) {},
+    get fillStyle() { return ""; },
+    strokeStyle: "", lineWidth: 0, globalAlpha: 1, lineCap: "",
+    save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {},
+    arc() {}, fill() {}, stroke() {}, fillRect() {},
+    translate(x: number, y: number) { log.push(x.toFixed(2) + "," + y.toFixed(2)); },
+    rotate(a: number) { log.push("r" + a.toFixed(4)); },
+  } as unknown as CanvasRenderingContext2D;
+  fight.draw(ctx);
+  return log;
+}
+
+function firstCowXY(fight: { draw: (ctx: CanvasRenderingContext2D) => void }): { x: number; y: number } {
+  let x = 0;
+  let y = 0;
+  let got = false;
+  const ctx = {
+    set fillStyle(_v: string) {},
+    get fillStyle() { return ""; },
+    strokeStyle: "", lineWidth: 0, globalAlpha: 1, lineCap: "",
+    save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {},
+    arc() {}, fill() {}, stroke() {}, fillRect() {}, rotate() {},
+    translate(tx: number, ty: number) { if (!got) { x = tx; y = ty; got = true; } },
+  } as unknown as CanvasRenderingContext2D;
+  fight.draw(ctx);
+  return { x, y };
+}
+
+describe("SaucerRing cow behavior", () => {
+  it("a walking cow changes position over time", () => {
+    const fight = createSaucerRing({ ...DEFAULT_SAUCER_RING, cowCount: 1, volleys: 0, shotGapMin: 999, shotGapMax: 999 });
+    const p = makeCursor();
+    for (let i = 0; i < 10; i++) fight.update(p, 1 / 120);
+    const a = firstCowXY(fight);
+    for (let i = 0; i < 110; i++) fight.update(p, 1 / 120);
+    const b = firstCowXY(fight);
+    expect(a.x !== b.x || a.y !== b.y).toBe(true);
+  });
+
+  it("cows are deterministic across instances with the same seed", () => {
+    const cfg = { ...DEFAULT_SAUCER_RING, cowCount: 4 };
+    const a = createSaucerRing(cfg);
+    const b = createSaucerRing(cfg);
+    expect(cowTransformLog(a, makeCursor(), 800)).toEqual(cowTransformLog(b, makeCursor(), 800));
+  });
+});

@@ -63,11 +63,8 @@ const COW_TURN_CHANCE = 0.5;
 const COW_GRAZE_EASE = 6; // head ease toward target (per s)
 const COW_STRIDE_RATE = 6; // stride phase units per s
 const COW_STATE_WALK = 0;
-const COW_STATE_GRAZE = 1; // used in Task 3 (cow motion)
+const COW_STATE_GRAZE = 1;
 const COW_RNG_OFFSET = 70000;
-// Task-3 constants — referenced here to satisfy noUnusedLocals until motion is added
-void COW_GRAZE_MIN; void COW_GRAZE_MAX; void COW_TURN_CHANCE;
-void COW_GRAZE_EASE; void COW_STRIDE_RATE; void COW_STATE_GRAZE;
 
 interface Cow {
   active: boolean;
@@ -207,6 +204,32 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
     const pcy = player.pos.y + CURSOR_SIZE / 2;
     animClock += dt;
 
+    for (let i = 0; i < activeCows; i++) {
+      const c = cows[i];
+      if (c.state === COW_STATE_WALK) {
+        c.angle += c.dir * (c.speed / COW_R) * dt;
+        c.stridePhase += COW_STRIDE_RATE * dt;
+        if (c.graze > 0) c.graze = Math.max(0, c.graze - COW_GRAZE_EASE * dt);
+        c.stateTimer -= dt;
+        if (c.stateTimer <= 0) {
+          if (cowRng.next() < COW_TURN_CHANCE) {
+            c.dir = -c.dir;
+            c.stateTimer = cowGap(COW_DECISION_GAP_MIN, COW_DECISION_GAP_MAX);
+          } else {
+            c.state = COW_STATE_GRAZE;
+            c.stateTimer = cowGap(COW_GRAZE_MIN, COW_GRAZE_MAX);
+          }
+        }
+      } else {
+        if (c.graze < 1) c.graze = Math.min(1, c.graze + COW_GRAZE_EASE * dt);
+        c.stateTimer -= dt;
+        if (c.stateTimer <= 0) {
+          c.state = COW_STATE_WALK;
+          c.stateTimer = cowGap(COW_DECISION_GAP_MIN, COW_DECISION_GAP_MAX);
+        }
+      }
+    }
+
     let anyBusy = false;
     for (let i = 0; i < activeAliens; i++) {
       const a = aliens[i];
@@ -296,11 +319,11 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
       const c = cows[i];
       const ca = Math.cos(c.angle);
       const sa = Math.sin(c.angle);
-      const cx = CX + ca * COW_R;
-      const cy = CY + sa * COW_R;
+      const cowX = CX + ca * COW_R;
+      const cowY = CY + sa * COW_R;
       const stride = c.state === COW_STATE_WALK ? (Math.floor(c.stridePhase) & 1) : 0;
       ctx.save();
-      ctx.translate(cx, cy);
+      ctx.translate(cowX, cowY);
       ctx.rotate(c.angle - Math.PI / 2);
       drawCow(ctx, 0, 0, COW_SCALE, c.dir, c.graze, stride);
       ctx.restore();
