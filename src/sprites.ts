@@ -128,6 +128,34 @@ export function drawSmallEye(
   ctx.fill();
 }
 
+// Rough rock outline: a closed polygon whose vertices are pushed in/out by
+// per-asteroid radius multipliers, rotated by `rotation`. Stroke only — vector art.
+export function drawAsteroid(
+  ctx: CanvasRenderingContext2D,
+  cx: number, cy: number, r: number,
+  rotation: number,
+  verts: readonly number[],
+): void {
+  const n = verts.length;
+  if (n < 3) return;
+  ctx.save();
+  ctx.strokeStyle = "#cfd8dc";
+  ctx.lineWidth = 2;
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const a = rotation + (i / n) * Math.PI * 2;
+    const rr = r * verts[i];
+    const x = cx + Math.cos(a) * rr;
+    const y = cy + Math.sin(a) * rr;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function drawBeamLine(
   ctx: CanvasRenderingContext2D,
   x1: number, y1: number, x2: number, y2: number,
