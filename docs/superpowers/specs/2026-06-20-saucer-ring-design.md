@@ -10,7 +10,10 @@ beams. This is v1; cows, abduction, dive-on-miss, and hostile cows come later.
 ## World
 
 - A **green circle** centered on the box center `CX,CY = 400,300`, radius
-  `WORLD_R = 285`, drawn as the world boundary. Everything stays inside it.
+  `WORLD_R = 285`, drawn as a stroked **outline** (not a filled disc), so the
+  interior stays black. Everything stays inside it. (Drawing it as an outline
+  also lets the JPEG saucer sprites — which carry a dark background, no
+  transparency — sit over the black interior where that background blends in.)
 - The existing square player box sits in the center. The annulus between the box
   and the circle is alien space.
 
@@ -47,25 +50,26 @@ Saucers are drawn from a provided pixel sprite sheet when available, falling bac
 to the procedural `drawUfo` otherwise — so the fight works with or without the
 asset.
 
-- **Asset:** `public/aliens.png` (the "Funky UFO Invaders" sheet). Vite serves it
-  at `/aliens.png`.
-- **Loading:** a small image loader (`new Image(); img.src = "/aliens.png"`)
-  loads it once; a `ready` flag flips on `onload`. While not ready (or on error),
-  draw falls back to `drawUfo`.
-- **Frame table:** a `SAUCER_FRAMES` constant lists the source rectangles
-  `{ sx, sy, sw, sh }` for each saucer design's three frames (idle / move /
-  animate). These coordinates are **measured from the committed `public/aliens.png`**
-  during implementation (the sheet has a title bar and row/column labels, so the
-  cells are not a clean grid from the origin).
-- **Per-saucer type:** each saucer is assigned a seeded design index at `reset()`.
-- **Animation:** the saucer cycles its three frames on a fixed timer for a lively
-  idle/hover; when ready, `draw` uses `ctx.drawImage(img, sx, sy, sw, sh, dx, dy,
-  dw, dh)` centered on the saucer position, sized to the saucer footprint.
+- **Asset:** `images/alien_sprite.jpeg` (the 1024×559 "Funky UFO Invaders"
+  sheet), imported as a Vite asset (`import url from "../../images/alien_sprite.jpeg"`)
+  so it gets a served, hashed URL.
+- **Loading:** a small image loader (`new Image(); img.src = url`) loads it once;
+  a `ready` flag flips on `onload`. While not ready (or on error), draw falls
+  back to `drawUfo`.
+- **Design used:** v1 uses one design — the blue/orange classic saucer (top
+  sprite row, third group of three frames). Its three frames (idle / move /
+  animate) are a `SAUCER_FRAMES` constant of source rectangles
+  `{ sx, sy, sw, sh }`. Starting coordinates come from the sheet grid (1024×559,
+  12 columns ≈ 83px, 5 rows ≈ 94px below an ~84px title+header band) and are
+  **fine-tuned during live browser verification** so each cell is centered.
+- **Animation:** the saucer cycles its three frames on a fixed timer; when ready,
+  `draw` uses `ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh)` centered on the
+  saucer position, sized to the saucer footprint.
 - **Orientation:** v1 draws the sprite upright (no rotation). Rotating each
   saucer to face the center is a later polish item.
 
-If `public/aliens.png` is absent the fight still renders (procedural saucers);
-adding the file later requires no code change beyond the measured frame table.
+If the image fails to load the fight still renders (procedural saucers via
+`drawUfo`).
 
 ## Collision & loss
 
