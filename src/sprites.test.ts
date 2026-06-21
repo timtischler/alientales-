@@ -120,3 +120,27 @@ describe("drawBeamLine", () => {
     expect(ctx.globalAlpha).toBe(1);
   });
 });
+
+import { drawCow } from "./sprites";
+
+describe("drawCow", () => {
+  it("draws exactly one muzzle fillRect (#f7b6c2 cow-census signature)", () => {
+    let muzzles = 0;
+    let fill = "";
+    const ctx = {
+      set fillStyle(v: string) { fill = v; },
+      get fillStyle() { return fill; },
+      fillRect() { if (fill === "#f7b6c2") muzzles++; },
+    } as unknown as CanvasRenderingContext2D;
+    drawCow(ctx, 0, 0, 1, 1, 0, 0);
+    expect(muzzles).toBe(1);
+  });
+
+  it("does not throw for grazing pose and reversed facing", () => {
+    const ctx = {
+      set fillStyle(_v: string) {},
+      fillRect() {},
+    } as unknown as CanvasRenderingContext2D;
+    expect(() => drawCow(ctx, 5, 5, 1.2, -1, 1, 1)).not.toThrow();
+  });
+});

@@ -144,3 +144,66 @@ export function drawBeamLine(
   ctx.stroke();
   ctx.restore();
 }
+
+// A small blocky cow, drawn centered at (x,y) in a local upright frame (feet at
+// local +y). The caller translates to the ring position and rotates by
+// `angle - PI/2` so the feet point outward and the head toward the ring center.
+// Built entirely from fillRect (mock-ctx friendly). Exactly one muzzle fillRect
+// at "#f7b6c2" per cow — render tests count these to census cows.
+export function drawCow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  scale: number,
+  facing: number,
+  grazeAmount: number,
+  stride: number,
+): void {
+  const s = scale;
+  const f = facing >= 0 ? 1 : -1;
+
+  // Legs (behind body) — two poses for a simple walk cycle.
+  ctx.fillStyle = "#2b2b2b";
+  const sp = stride === 0 ? 1 : -1;
+  const legY = y + 2 * s;
+  const legH = 5 * s;
+  const legW = 1.6 * s;
+  ctx.fillRect(x + (-5 + sp) * s, legY, legW, legH);
+  ctx.fillRect(x + (-2 - sp) * s, legY, legW, legH);
+  ctx.fillRect(x + (2 + sp) * s, legY, legW, legH);
+  ctx.fillRect(x + (5 - sp) * s, legY, legW, legH);
+
+  // Body — white blocky torso.
+  ctx.fillStyle = "#f2f2f2";
+  ctx.fillRect(x - 7 * s, y - 4 * s, 14 * s, 8 * s);
+
+  // Spots — black.
+  ctx.fillStyle = "#1f1f1f";
+  ctx.fillRect(x - 4 * s, y - 2 * s, 3 * s, 3 * s);
+  ctx.fillRect(x + 1 * s, y, 3 * s, 3 * s);
+
+  // Tail — trailing side.
+  ctx.fillStyle = "#f2f2f2";
+  ctx.fillRect(x - f * 8 * s, y - 3 * s, 1.4 * s, 6 * s);
+
+  // Head — leading side; lowers toward the grass as grazeAmount rises.
+  const headX = x + f * 7 * s;
+  const headY = y + (-2 + grazeAmount * 7) * s;
+
+  // Horns.
+  ctx.fillStyle = "#d8c08a";
+  ctx.fillRect(headX - 1.5 * s, headY - 4 * s, 1.2 * s, 2 * s);
+  ctx.fillRect(headX + f * 2 * s, headY - 4 * s, 1.2 * s, 2 * s);
+
+  // Ear (trailing edge of head).
+  ctx.fillStyle = "#f2f2f2";
+  ctx.fillRect(headX - f * 2 * s, headY - 2.5 * s, 2 * s, 1.6 * s);
+
+  // Head block.
+  ctx.fillStyle = "#f2f2f2";
+  ctx.fillRect(headX - 2 * s, headY - 2 * s, 4.5 * s, 4 * s);
+
+  // Muzzle (pink) — exactly one per cow; cow-census signature.
+  ctx.fillStyle = "#f7b6c2";
+  ctx.fillRect(headX + f * 1.5 * s, headY - 1 * s, 2.2 * s, 2.4 * s);
+}
