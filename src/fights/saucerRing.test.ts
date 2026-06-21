@@ -205,4 +205,40 @@ describe("SaucerRing chunked tractor beam", () => {
     for (let i = 0; i < 120 && status === "running"; i++) status = fight.update(p, 1 / 120);
     expect(status).toBe("lost");
   });
+
+  it("clears the tractor beam on reset (no beam drawn after death/restart)", () => {
+    // Count thick beam strokes: the beam draws at lineWidth = beamWidth (24)
+    // via drawBeamLine/drawBeamGradient; the ring and telegraph use width 3.
+    function thickBeamStrokes(f: { draw: (ctx: CanvasRenderingContext2D) => void }): number {
+      let count = 0;
+      let lw = 0;
+      const ctx = {
+        set fillStyle(_v: string) {}, get fillStyle() { return ""; },
+        set strokeStyle(_v: string) {},
+        set lineWidth(v: number) { lw = v; }, get lineWidth() { return lw; },
+        set globalAlpha(_v: number) {}, get globalAlpha() { return 1; },
+        set lineCap(_v: string) {},
+        save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {},
+        arc() {}, fill() {}, stroke() { if (lw > 5) count++; }, fillRect() {},
+        translate() {}, rotate() {},
+      } as unknown as CanvasRenderingContext2D;
+      f.draw(ctx);
+      return count;
+    }
+
+    const fight = createSaucerRing({
+      ...DEFAULT_SAUCER_RING,
+      alienCount: 1, volleys: 5,
+      shotGapMin: 999, shotGapMax: 999,
+      tractorGapMin: 0, tractorGapMax: 0,
+      telegraphTime: 0.1, beamTime: 1.0, beamChunks: 20,
+    });
+    const p = makeCursor();
+    let status: FightStatus = "running";
+    for (let i = 0; i < 200 && status === "running"; i++) status = fight.update(p, 1 / 120);
+    expect(status).toBe("lost"); // died while a beam was extended
+    expect(thickBeamStrokes(fight)).toBeGreaterThan(0); // beam on screen at death
+    fight.reset();
+    expect(thickBeamStrokes(fight)).toBe(0); // beam cleared after reset
+  });
 });

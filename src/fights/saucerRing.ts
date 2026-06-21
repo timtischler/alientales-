@@ -186,6 +186,7 @@ export function createSaucerRing(cfg: SaucerRingConfig): Fight {
       a.tractorTimer = gap(cfg.tractorGapMin, cfg.tractorGapMax);
       a.phase = PHASE_ORBIT;
       a.stateTimer = 0;
+      a.beamLen = 0;
     }
     for (let i = 0; i < MAX_SHOTS; i++) shots[i].active = false;
     cowRng.reseed(cfg.seed + COW_RNG_OFFSET);
