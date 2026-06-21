@@ -41,6 +41,32 @@ beams. This is v1; cows, abduction, dive-on-miss, and hostile cows come later.
 - The beam is the segment from the saucer through the center to the opposite rim
   (length `2*ALIEN_R` along the inward normal).
 
+## Saucer sprites (sprite sheet, with fallback)
+
+Saucers are drawn from a provided pixel sprite sheet when available, falling back
+to the procedural `drawUfo` otherwise — so the fight works with or without the
+asset.
+
+- **Asset:** `public/aliens.png` (the "Funky UFO Invaders" sheet). Vite serves it
+  at `/aliens.png`.
+- **Loading:** a small image loader (`new Image(); img.src = "/aliens.png"`)
+  loads it once; a `ready` flag flips on `onload`. While not ready (or on error),
+  draw falls back to `drawUfo`.
+- **Frame table:** a `SAUCER_FRAMES` constant lists the source rectangles
+  `{ sx, sy, sw, sh }` for each saucer design's three frames (idle / move /
+  animate). These coordinates are **measured from the committed `public/aliens.png`**
+  during implementation (the sheet has a title bar and row/column labels, so the
+  cells are not a clean grid from the origin).
+- **Per-saucer type:** each saucer is assigned a seeded design index at `reset()`.
+- **Animation:** the saucer cycles its three frames on a fixed timer for a lively
+  idle/hover; when ready, `draw` uses `ctx.drawImage(img, sx, sy, sw, sh, dx, dy,
+  dw, dh)` centered on the saucer position, sized to the saucer footprint.
+- **Orientation:** v1 draws the sprite upright (no rotation). Rotating each
+  saucer to face the center is a later polish item.
+
+If `public/aliens.png` is absent the fight still renders (procedural saucers);
+adding the file later requires no code change beyond the measured frame table.
+
 ## Collision & loss
 
 Each fixed step, the player center (`cursor.pos + CURSOR_SIZE/2`, radius
